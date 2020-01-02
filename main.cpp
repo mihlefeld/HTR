@@ -12,8 +12,8 @@ struct Cube{
 };
 
 
-std::vector<Cube> htr_states_non_unique;
-Cube htr_states[96];
+std::vector<uint32_t> htr_states_non_unique;
+uint32_t htr_states[96];
 // if (lm == 0 || prevent_moves[lm][m])
 //                             0 1 2 3 4 5 6 7 8 9 10
 bool prevent_moves[11][11] = {{0,0,0,0,0,0,0,0,0,0,0}, // 0
@@ -188,7 +188,7 @@ std::string parse_cube_inv(Cube cb) {
 
 void init_htr_states_non_unique(Cube cb, uint8_t d, uint8_t lm) {
     cb = move(cb,lm);
-    htr_states_non_unique.push_back(cb);
+    htr_states_non_unique.push_back(cb.c);
     if (d == 0) return;
     for (uint8_t m = 5; m <= 10; m++) {
         init_htr_states_non_unique(cb, d - 1, m);
@@ -202,7 +202,7 @@ void init_htr_states_non_unique(Cube cb, uint8_t d, uint8_t lm) {
 void init_htr_states() {
     init_htr_states_non_unique(parse_cube("00000000", "01234567"),4,0);
     int i = 0;
-    for(Cube cb: htr_states_non_unique) {
+    for(uint32_t cb: htr_states_non_unique) {
         bool exists = false;
         for(int j = 0; j < i; j++) {
             if(cb == htr_states[j]) {
@@ -217,8 +217,9 @@ void init_htr_states() {
 }
 
 bool is_htr(Cube cb) {
+    if(cb.e != 0) return false;
     for (uint8_t i = 0; i < 96; i++) {
-        if(cb == htr_states[i]) return true;
+        if(cb.c == htr_states[i]) return true;
     }
     return false;
 }
@@ -326,36 +327,19 @@ int main(int argc, char** argv) {
         cb = parse_cube(eo, cp);
     }
 
-    std::cout << "{";
-    for (int i = 0; i < 96; i++) {
-        Cube cb = htr_states[i];
-        std::bitset<24> bits(cb.c);
-        if(i == 95) {
-            std::cout << bits << "};" << std::endl;
-        }
-        else {
-            std::cout << bits << "," << std::endl;
-        }
-    }
-    std::cout << "}";
+    if(is_htr(cb)) {
 
-    cb = parse_cube("00000000", "01234567");
-    //F2 U2 L D2 L2 F2 L U2 R
-    cb = move(cb, 4); cb = move(cb, 7); cb = move(cb, 2);
-    cb = move(cb, 9); cb = move(cb, 5); cb = move(cb, 8);
-    cb = move(cb, 2); cb = move(cb, 7); cb = move(cb, 9);
-    std::cout << parse_cube_inv(cb) << std::endl;
+    }
     std::clock_t t0 = std::clock();
     for(int d = 1; d <= depth; d++) {
-        uint8_t* moves = new uint8_t[d+2];
+        uint8_t* moves = new uint8_t[d];
         std::cout << "Searching depth " << d << std::endl;
         if(search(cb, d, moves)) {
             std::cout << "Found HTR in " << d << " moves" << std::endl;
             std::cout << convert_to_wca_notation(moves, d) << std::endl;
-            std::cout << "Done in " << (float)(std::clock() - t0)/CLOCKS_PER_SEC << std::endl;
             break;
         }
     }
-    std::cout << 1;
+    std::cout << "Done in " << (float)(std::clock() - t0)/CLOCKS_PER_SEC << std::endl;
     return 0;
 }
