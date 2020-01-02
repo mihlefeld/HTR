@@ -4,13 +4,10 @@
 #include <bitset>
 #include <string>
 #include <ctime>
+#include <omp.h>
+#include "htr_cube.h"
 
-
-struct Cube{
-    uint8_t e;
-    uint32_t c;
-};
-
+#define MAX_DEPTH 13
 
 std::vector<uint32_t> htr_states_non_unique;
 uint32_t htr_states[96];
@@ -27,137 +24,6 @@ bool prevent_moves[11][11] = {{0,0,0,0,0,0,0,0,0,0,0}, // 0
                               {0,1,1,1,1,1,1,1,0,1,1}, // 8
                               {0,1,1,1,1,1,1,1,1,0,1}, // 9
                               {0,1,1,1,1,1,1,1,1,1,0}}; // 10
-
-
-inline uint8_t swap_bits_8bit(uint8_t n, uint8_t b1, uint8_t b2, uint8_t mask) {
-    uint8_t h = ((n >> b1) & mask) ^ ((n >> b2) & mask);
-    return n ^ ((h << b1) | (h << b2));
-}
-
-inline uint32_t swap_bits_32bit(uint32_t n, uint32_t b1, uint32_t b2, uint32_t mask) {
-    uint32_t h = ((n >> b1) & mask) ^ ((n >> b2) & mask);
-    return n ^ ((h << b1) | (h << b2));
-}
-
-inline uint8_t cycle_bits_8bit(uint8_t n, uint8_t b1, uint8_t b2, uint8_t b3, uint8_t b4, uint8_t mask) {
-    n = swap_bits_8bit(n,b1,b2,mask);
-    n = swap_bits_8bit(n,b1,b3,mask);
-    n = swap_bits_8bit(n,b1,b4,mask);
-    return n;
-}
-
-inline uint32_t cycle_bits_32bit(uint32_t n, uint32_t b1, uint32_t b2, uint32_t b3, uint32_t b4, uint32_t mask) {
-    n = swap_bits_32bit(n,b1,b2,mask);
-    n = swap_bits_32bit(n,b1,b3,mask);
-    n = swap_bits_32bit(n,b1,b4,mask);
-    return n;
-}
-
-inline uint8_t toggle(uint8_t n, uint8_t b) {
-    return n ^ (1 << b);
-}
-
-Cube move(Cube cb, uint8_t m) {
-    switch(m) {
-        case 1:
-            // L
-            // EO: cycle 7-2-5-3
-            cb.e = cycle_bits_8bit(cb.e,7,2,5,3,1);
-            cb.e = toggle(cb.e,7);
-            cb.e = toggle(cb.e,2);
-            cb.e = toggle(cb.e,5);
-            cb.e = toggle(cb.e,3),
-            // CP: cycle 7-2-1-6
-            cb.c = cycle_bits_32bit(cb.c,7*3,2*3,1*3,6*3,7);
-            return cb;
-        case 2:
-            // L'
-            // EO: cycle 7-3-5-2
-            cb.e = cycle_bits_8bit(cb.e,7,3,5,2,1);
-            cb.e = toggle(cb.e,7);
-            cb.e = toggle(cb.e,2);
-            cb.e = toggle(cb.e,5);
-            cb.e = toggle(cb.e,3),
-            // CP: cycle 7-6-1-2
-            cb.c = cycle_bits_32bit(cb.c,7*3,6*3,1*3,2*3,7);
-            return cb;
-        case 3:
-            // R
-            // EO: cycle 6-1-4-0
-            cb.e = cycle_bits_8bit(cb.e,6,1,4,0,1);
-            cb.e = toggle(cb.e,6);
-            cb.e = toggle(cb.e,1);
-            cb.e = toggle(cb.e,4);
-            cb.e = toggle(cb.e,0);
-            // CP: cycle 4-5-0-3
-            cb.c = cycle_bits_32bit(cb.c,4*3,5*3,0*3,3*3,7);
-            break;
-        case 4:
-            // R'
-            // EO: cycle 6-0-4-1
-            cb.e = cycle_bits_8bit(cb.e,6,0,4,1,1);
-            cb.e = toggle(cb.e,6);
-            cb.e = toggle(cb.e,1);
-            cb.e = toggle(cb.e,4);
-            cb.e = toggle(cb.e,0),
-            // CP: cycle 4-3-0-5
-            cb.c = cycle_bits_32bit(cb.c,4*3,3*3,0*3,5*3,7);
-            return cb;
-        case 5:
-            // L2
-            // EO: swap bits 7 and 5, swap bits 3 and 2
-            cb.e = swap_bits_8bit(cb.e,7,5,1);
-            cb.e = swap_bits_8bit(cb.e,3,2,1);
-            // CP: swap bytes 7 and 1, swap bytes 6 and 2
-            cb.c = swap_bits_32bit(cb.c,7*3,1*3,7);
-            cb.c = swap_bits_32bit(cb.c,6*3,2*3,7);
-            return cb;
-        case 6:
-            // R2
-            // EO: swap bits 6 and 4, swap bits 1 and 0
-            cb.e = swap_bits_8bit(cb.e,6,4,1);
-            cb.e = swap_bits_8bit(cb.e,1,0,1);
-            // CP: swap bytes 4 and 0, swap bytes 5 and 3
-            cb.c = swap_bits_32bit(cb.c,4*3,0*3,7);
-            cb.c = swap_bits_32bit(cb.c,5*3,3*3,7);
-            return cb;
-        case 7:
-            // U2
-            // EO: swap bits 7 and 6
-            cb.e = swap_bits_8bit(cb.e,7,6,1);
-            // CP: swap bytes 7 and 5, swap bytes 6 and 4
-            cb.c = swap_bits_32bit(cb.c,4*3,6*3,7);
-            cb.c = swap_bits_32bit(cb.c,7*3,5*3,7);
-            return cb;
-        case 8:
-            // D2
-            // EO: swap bits 4 and 5
-            cb.e = swap_bits_8bit(cb.e,4,5,1);
-            // CP: swap bytes 1 and 3, swap bytes 0 and 2
-            cb.c = swap_bits_32bit(cb.c,0*3,2*3,7);
-            cb.c = swap_bits_32bit(cb.c,1*3,3*3,7);
-            return cb;
-        case 9:
-            // F2
-            // EO: swap bits 0 and 2
-            cb.e = swap_bits_8bit(cb.e,0,2,1);
-            // CP: swap bytes 7 and 3, swap bytes 4 and 2
-            cb.c = swap_bits_32bit(cb.c,7*3,3*3,7);
-            cb.c = swap_bits_32bit(cb.c,4*3,2*3,7);
-            return cb;
-        case 10:
-            // B2
-            // EO: swap bits 1 and 3
-            cb.e = swap_bits_8bit(cb.e,1,3,1);
-            // CP: swap bytes 6 and 0, swap bytes 5 and 1
-            cb.c = swap_bits_32bit(cb.c,6*3,0*3,7);
-            cb.c = swap_bits_32bit(cb.c,5*3,1*3,7);
-            return cb;
-        default:
-            return cb;
-    }
-    return cb;
-}
 
 Cube parse_cube(const char* eo_str, const char* cp_str) {
     uint8_t eo = 0;
@@ -214,10 +80,13 @@ void init_htr_states() {
 
 bool is_htr(Cube cb) {
     if(cb.e != 0) return false;
+    if((cb.c & 0b00000000001001001001001001001001) != 0b00000000000001000001000001000001) return false;
+    bool is_htr = false;
+#pragma omp simd
     for (uint8_t i = 0; i < 96; i++) {
-        if(cb.c == htr_states[i]) return true;
+        is_htr |= cb.c == htr_states[i];
     }
-    return false;
+    return is_htr;
 }
 
 bool search(Cube cb, uint8_t d, uint8_t sd, uint8_t lm, uint8_t* moves) {
@@ -252,10 +121,16 @@ bool search(Cube cb, uint8_t d, uint8_t sd, uint8_t lm, uint8_t* moves) {
     return false;
 }
 
-bool search(Cube cb, uint8_t d, uint8_t* moves) {
+bool call_search(Cube cb, uint8_t d, uint8_t* moves) {
     return search(cb, d, d,0, moves);
 }
 
+/**
+ * 
+ * @param int_moves
+ * @param count
+ * @return
+ */
 std::string convert_to_wca_notation(uint8_t* int_moves, uint8_t count) {
     std::string wca_moves = "";
     for (int i = 0; i < count; i++) {
@@ -300,21 +175,37 @@ int main(int argc, char** argv) {
     init_htr_states();
     int depth = 10;
     Cube cb;
-    if(argc == 4) {
+    if(argc >= 4) {
         depth = std::stoi(argv[3]);
         cb = parse_cube(argv[1], argv[2]);
     }
 
-    std::cout << (int) cb.e << std::endl;
+    bool findall = false;
 
+    std::cout << (int) cb.c << std::endl;
+
+
+    // standard test: 00100010 02173654
     std::clock_t t0 = std::clock();
     for(int d = 1; d <= depth; d++) {
-        uint8_t* moves = new uint8_t[d];
         std::cout << "Searching depth " << d << std::endl;
-        if(search(cb, d, moves)) {
-            std::cout << "Found HTR in " << d << " moves" << std::endl;
-            std::cout << convert_to_wca_notation(moves, d) << std::endl;
-            break;
+        if(findall && d > 1) {
+#pragma omp parallel for
+            for(uint8_t i = 1; i <= 10; i++) {
+                uint8_t moves[MAX_DEPTH];
+                moves[0] = i;
+
+                if(search(cb, d-1, d, i, moves)) {
+                    std::cout << "Found HTR in " << d << " moves: " << convert_to_wca_notation(moves, d) << std::endl;
+                }
+            }
+        } else {
+            uint8_t moves[MAX_DEPTH];
+            if(call_search(cb, d, moves)) {
+                std::cout << "Found HTR in " << d << " moves" << std::endl;
+                std::cout << convert_to_wca_notation(moves, d) << std::endl;
+                break;
+            }
         }
     }
     std::cout << "Done in " << (float)(std::clock() - t0)/CLOCKS_PER_SEC << std::endl;
