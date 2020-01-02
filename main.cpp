@@ -171,7 +171,7 @@ Cube parse_cube(const char* eo_str, const char* cp_str) {
         cp <<= 3;
     }
     cp >>= 3;
-    return {0, cp};
+    return {eo, cp};
 }
 
 std::string parse_cube_inv(Cube cb) {
@@ -193,10 +193,6 @@ void init_htr_states_non_unique(Cube cb, uint8_t d, uint8_t lm) {
     for (uint8_t m = 5; m <= 10; m++) {
         init_htr_states_non_unique(cb, d - 1, m);
     }
-}
-
- bool operator==(Cube a, Cube b) {
-    return a.e == b.e && a.c == b.c;
 }
 
 void init_htr_states() {
@@ -232,7 +228,6 @@ bool search(Cube cb, uint8_t d, uint8_t sd, uint8_t lm, uint8_t* moves) {
             cb = move(cb,1);
             if (is_htr(cb)) {
                 moves[sd-d] = 1;
-                std::cout << 1 << " ";
                 return true;
             }
         }
@@ -240,7 +235,6 @@ bool search(Cube cb, uint8_t d, uint8_t sd, uint8_t lm, uint8_t* moves) {
             cb = move(cb2,3);
             if (is_htr(cb)) {
                 moves[sd-d] = 3;
-                std::cout << 3 << " ";
                 return true;
             }
         }
@@ -251,10 +245,6 @@ bool search(Cube cb, uint8_t d, uint8_t sd, uint8_t lm, uint8_t* moves) {
             bool b = search(cb, d - 1, sd, m, moves);
             if (b){
                 moves[sd-d] = m;
-                std::cout << m << " ";
-                if (d==sd) {
-                    std::cout << std::endl;
-                }
                 return true;
             }
         }
@@ -263,7 +253,6 @@ bool search(Cube cb, uint8_t d, uint8_t sd, uint8_t lm, uint8_t* moves) {
 }
 
 bool search(Cube cb, uint8_t d, uint8_t* moves) {
-    if (is_htr(cb)) return true;
     return search(cb, d, d,0, moves);
 }
 
@@ -311,25 +300,13 @@ int main(int argc, char** argv) {
     init_htr_states();
     int depth = 10;
     Cube cb;
-    if(argc >= 2) {
-        depth = std::stoi(argv[1]);
-    }
     if(argc == 4) {
+        depth = std::stoi(argv[1]);
         cb = parse_cube(argv[2], argv[3]);
     }
-    else {
-        char eo[8];
-        char cp[8];
-        std::cout << "Enter eo: " << std::endl;
-        std::cin >> eo;
-        std::cout << "Enter cp: " << std::endl;
-        std::cin >> cp;
-        cb = parse_cube(eo, cp);
-    }
 
-    if(is_htr(cb)) {
+    std::cout << (int) cb.e << std::endl;
 
-    }
     std::clock_t t0 = std::clock();
     for(int d = 1; d <= depth; d++) {
         uint8_t* moves = new uint8_t[d];
