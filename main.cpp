@@ -301,8 +301,8 @@ int main(int argc, char** argv) {
     int depth = 10;
     Cube cb;
     if(argc == 4) {
-        depth = std::stoi(argv[1]);
-        cb = parse_cube(argv[2], argv[3]);
+        depth = std::stoi(argv[3]);
+        cb = parse_cube(argv[1], argv[2]);
     }
 
     std::cout << (int) cb.e << std::endl;
