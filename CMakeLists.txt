@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.15)
 project(HTR)
-add_executable(HTR main.cpp htr_cube.h htr_solver.h)
+add_executable(HTR main.cpp prevent_moves_3d.h)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_FLAGS_RELEASE "-O3")

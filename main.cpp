@@ -5,6 +5,9 @@
 #include <string>
 #include <ctime>
 #include <omp.h>
+#include <cmath>
+#include <fstream>
+#include <algorithm>
 #include "htr_cube.h"
 
 #define MAX_DEPTH 13
@@ -13,7 +16,7 @@ std::vector<uint32_t> htr_states_non_unique;
 uint32_t htr_states[96];
 // if (lm == 0 || prevent_moves[lm][m])
 //                             0 1 2 3 4 5 6 7 8 9 10
-bool prevent_moves[11][11] = {{0,0,0,0,0,0,0,0,0,0,0}, // 0
+bool prevent_moves[11][11] = {{1,1,1,1,1,1,1,1,1,1,1}, // 0
                               {0,0,0,1,1,0,1,1,1,1,1}, // 1
                               {0,0,0,1,1,0,1,1,1,1,1}, // 2
                               {0,1,1,0,0,1,0,1,1,1,1}, // 3
@@ -24,6 +27,28 @@ bool prevent_moves[11][11] = {{0,0,0,0,0,0,0,0,0,0,0}, // 0
                               {0,1,1,1,1,1,1,1,0,1,1}, // 8
                               {0,1,1,1,1,1,1,1,1,0,1}, // 9
                               {0,1,1,1,1,1,1,1,1,1,0}}; // 10
+
+/*
+ * 8 cases
+ * 1111 +
+ * 1100 +
+ * 1010 +
+ * 1001 +
+ * 0110 +
+ * 0101 +
+ * 0011 +
+ * 0000
+ */
+uint32_t lookup_parity[8] = {
+        0b00000000100100100100000000000000,
+        0b00000000100100000000000000000000,
+        0b00000000100000100000000000000000,
+        0b00000000100000000100000000000000,
+        0b00000000000100100000000000000000,
+        0b00000000000100000100000000000000,
+        0b00000000000000100100000000000000,
+        0b00000000000000000000000000000000};
+
 
 Cube parse_cube(const char* eo_str, const char* cp_str) {
     uint8_t eo = 0;
@@ -79,9 +104,20 @@ void init_htr_states() {
 }
 
 bool is_htr(Cube cb) {
+    //if(cb.c != 0b00000000000001010011100101110111) return false;
     if(cb.e != 0) return false;
     if((cb.c & 0b00000000001001001001001001001001) != 0b00000000000001000001000001000001) return false;
-    bool is_htr = false;
+    uint8_t ct = cb.c & 0b00000000100100100100000000000000;
+    uint8_t is_htr = 0;
+    uint8_t is_cpar = 0;
+
+#pragma omp simd
+    for (uint8_t i = 0; i < 8; i++) {
+        is_cpar &= ct != lookup_parity[i];
+    }
+    if(is_cpar)
+        return false;
+
 #pragma omp simd
     for (uint8_t i = 0; i < 96; i++) {
         is_htr |= cb.c == htr_states[i];
@@ -93,14 +129,14 @@ bool search(Cube cb, uint8_t d, uint8_t sd, uint8_t lm, uint8_t* moves) {
     cb = move(cb,lm);
     if (d == 1) {
         Cube cb2 = cb;
-        if (lm == 0 || prevent_moves[lm][1]) {
+        if (prevent_moves[lm][1]) {
             cb = move(cb,1);
             if (is_htr(cb)) {
                 moves[sd-d] = 1;
                 return true;
             }
         }
-        if(lm == 0 || prevent_moves[lm][3]) {
+        if(prevent_moves[lm][3]) {
             cb = move(cb2,3);
             if (is_htr(cb)) {
                 moves[sd-d] = 3;
@@ -110,7 +146,7 @@ bool search(Cube cb, uint8_t d, uint8_t sd, uint8_t lm, uint8_t* moves) {
         return false;
     }
     for (int m = 1; m <= 10; m++) {
-        if (lm == 0 || prevent_moves[lm][m]) {
+        if (prevent_moves[lm][m]) {
             bool b = search(cb, d - 1, sd, m, moves);
             if (b){
                 moves[sd-d] = m;
@@ -171,43 +207,186 @@ std::string convert_to_wca_notation(uint8_t* int_moves, uint8_t count) {
     return wca_moves;
 }
 
+void gen_domino_states(std::vector<Cube>& states) {
+    std::string cp = "01234567";
+    uint8_t eos[128];
+    int non_parity_count = 0;
+    for(uint8_t eo; eo < 255; eo++) {
+        uint8_t parity = eo;
+        for(uint8_t b = 1; b < 4; b = b << 1) {
+            parity = parity ^ (parity >> b);
+        }
+        if(!(parity & 1)) {
+            eos[non_parity_count] = eo;
+            non_parity_count++;
+        }
+    }
+
+    std::vector<uint32_t> cps;
+    do {
+        Cube cb = parse_cube("00000000", cp.c_str());
+        cps.push_back(cb.c);
+    } while (std::next_permutation(cp.begin(), cp.end()));
+
+    for(uint8_t e: eos) {
+        for(uint32_t c: cps) {
+            states.push_back({e,c});
+        }
+    }
+}
+
+uint32_t transform(uint8_t c, uint8_t t) {
+    switch (t){
+        case 1:
+            c = swap_bits_32bit(c,1*3,3*3,7);
+            return c;
+        case 2:
+            c = swap_bits_32bit(c,3*3,1*3,7);
+            c = swap_bits_32bit(c,3*3,7*3,7);
+            return c;
+        case 3:
+            c = swap_bits_32bit(c,3*3,7*3,7);
+            c = swap_bits_32bit(c,3*3,1*3,7);
+            return c;
+        case 4:
+            c = swap_bits_32bit(c,2*3,0*3,7);
+            c = swap_bits_32bit(c,2*3,4*3,7);
+            return c;
+        case 5:
+            c = swap_bits_32bit(c,2*3,4*3,7);
+            c = swap_bits_32bit(c,2*3,0*3,7);
+            return c;
+        default:
+            return c;
+    }
+}
+
+void print_human_method_states(Cube cb, uint8_t* moves, uint8_t count) {
+    Cube tcb = cb;
+    for (uint8_t i = 0; i < count; i++) {
+        tcb = move(tcb, moves[i]);
+    }
+    cb.c = tcb.c;
+
+ //   for
+}
+
+/*
+"""
+GET_HUMAN_METHOD_STATES
+Diese Funktion berechnet für die aktuelle HTR alle 6 anderen Möglichkeiten den gleichen EO+CO cases zu lösen, aber CP verändert.
+"""
+function get_human_method_states(e,c,list)
+    #Führe die HTR aus
+    for m in list
+        et,c = move(e,c,m)
+    end
+    #Führe 5 verschiedene kanonische CP Transformationen aus
+    list2 = reverse(list)
+    co = zeros(UInt64,5)
+    for t = 1:5
+        co[t] = transform(c,t)
+        #Für jede von ihnen, invertiere die Züge in list
+        for m in list2
+            et,co[t] = move_back(e,co[t],m)
+        end
+        #Berechne für diese jeweils eine HTR solution
+        for i = 1:11
+            println(i)
+            f,htrs = search(e,co[t],i,0)
+            if f
+                println(list_to_notation(htrs))
+                break
+            end
+        end
+    end
+end
+ */
+
 int main(int argc, char** argv) {
+
+    clock_t t0 = std::clock();
     init_htr_states();
-    int depth = 10;
+    int depth = 4;
     Cube cb;
-    if(argc >= 4) {
+    bool normal = true;
+    if(argc == 4) {
         depth = std::stoi(argv[3]);
         cb = parse_cube(argv[1], argv[2]);
     }
+    else if (argc == 2) {
+        depth = std::stoi(argv[1]);
+        normal = false;
+    }
+    else {
+        normal = false;
+    }
 
-    bool findall = false;
+    if(!normal) {
+        std::cout << "Generating all HTR cases" << std::endl;
+        std::vector<Cube> states;
+        gen_domino_states(states);
+        std::clock_t t1 = std::clock();
+        uint8_t num_threads = 12;
+        std::vector<uint8_t*> solutions;
+        solutions.resize(states.size());
 
-    std::cout << (int) cb.c << std::endl;
+#pragma omp parallel for num_threads(12)
+        for(uint8_t i = 0; i < num_threads; i++) {
+            uint32_t chunk_size = states.size() / num_threads;
+            uint32_t start_index = i * chunk_size;
+            uint32_t end_index = (i == num_threads - 1) ? states.size() - 1 : start_index + chunk_size;
+            uint32_t progress_chunks = chunk_size/100;
+            uint32_t percent = 0;
+            uint32_t prog = 0;
+            t0 = std::clock();
 
-
-    // standard test: 00100010 02173654
-    std::clock_t t0 = std::clock();
-    for(int d = 1; d <= depth; d++) {
-        std::cout << "Searching depth " << d << std::endl;
-        if(findall && d > 1) {
-#pragma omp parallel for
-            for(uint8_t i = 1; i <= 10; i++) {
-                uint8_t moves[MAX_DEPTH];
-                moves[0] = i;
-
-                if(search(cb, d-1, d, i, moves)) {
-                    std::cout << "Found HTR in " << d << " moves: " << convert_to_wca_notation(moves, d) << std::endl;
+            for(uint32_t j = start_index; j <= end_index; j++) {
+                prog++;
+                if(i == num_threads - 1 && prog >= progress_chunks) {
+                    prog = 0;
+                    std::cout << (int) percent << "% @" << (float)(std::clock() - t0)/CLOCKS_PER_SEC << "s" << std::endl;;
+                    percent++;
+                }
+                solutions[j] = new uint8_t[depth];
+                if(is_htr(states[j])) {
+                    solutions[j][0] = 255;
+                    continue;
+                }
+                for(int d = 1; d <= depth; d++) {
+                    if(!call_search(states[j], d, solutions[j])) {
+                        solutions[j][0] = 255;
+                    } else {
+                        break;
+                    }
                 }
             }
-        } else {
+        }
+
+        std::fstream file("cases.txt", std::fstream::out);
+        for(uint32_t i = 0; i < states.size(); i++) {
+            if(solutions[i][0] != 255) {
+                file << "Case: " << parse_cube_inv(states[i]) << " Solution:" << convert_to_wca_notation(solutions[i], depth) << std::endl;
+            }
+            free(solutions[i]);
+        }
+        std::cout << "Done!" << std::endl;
+        file.close();
+    }
+    else {
+        bool findall = false;
+        // standard test: 00100010 02173654
+        t0 = std::clock();
+        for(int d = 1; d <= depth; d++) {
+            std::cout << "Searching depth " << d << std::endl;
             uint8_t moves[MAX_DEPTH];
             if(call_search(cb, d, moves)) {
                 std::cout << "Found HTR in " << d << " moves" << std::endl;
                 std::cout << convert_to_wca_notation(moves, d) << std::endl;
-                break;
+                if(!findall) break;
             }
         }
+        std::cout << "Done in " << (float)(std::clock() - t0)/CLOCKS_PER_SEC << std::endl;
     }
-    std::cout << "Done in " << (float)(std::clock() - t0)/CLOCKS_PER_SEC << std::endl;
     return 0;
 }

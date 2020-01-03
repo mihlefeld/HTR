@@ -5,7 +5,6 @@
 #ifndef HTR_HTR_CUBE_H
 #define HTR_HTR_CUBE_H
 
-#endif //HTR_HTR_CUBE_H
 
 struct Cube{
     uint8_t e;
@@ -40,7 +39,7 @@ inline uint8_t toggle(uint8_t n, uint8_t b) {
     return n ^ (1 << b);
 }
 
-Cube move(Cube cb, uint8_t m) {
+inline Cube move(Cube cb, uint8_t m) {
     switch(m) {
         case 1:
             // L
@@ -51,8 +50,8 @@ Cube move(Cube cb, uint8_t m) {
             cb.e = toggle(cb.e,2);
             cb.e = toggle(cb.e,5);
             cb.e = toggle(cb.e,3),
-                    // CP: cycle 7-2-1-6
-                    cb.c = cycle_bits_32bit(cb.c,7*3,2*3,1*3,6*3,7);
+            // CP: cycle 7-2-1-6
+            cb.c = cycle_bits_32bit(cb.c,7*3,2*3,1*3,6*3,7);
             return cb;
         case 2:
             // L'
@@ -143,3 +142,19 @@ Cube move(Cube cb, uint8_t m) {
     return cb;
 }
 
+Cube move_back(Cube cb, uint8_t m) {
+    switch (m){
+        case 1:
+            return move(cb,2);
+        case 2:
+            return move(cb,1);
+        case 3:
+            return move(cb,4);
+        case 4:
+            return move(cb,3);
+        default:
+            return move(cb, m);
+    }
+}
+
+#endif //HTR_HTR_CUBE_H
