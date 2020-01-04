@@ -9,6 +9,7 @@
 #include <fstream>
 #include <algorithm>
 #include "htr_cube.h"
+#include "prevent_moves_3d.h"
 
 #define MAX_DEPTH 13
 
@@ -16,7 +17,7 @@ std::vector<uint32_t> htr_states_non_unique;
 uint32_t htr_states[96];
 // if (lm == 0 || prevent_moves[lm][m])
 //                             0 1 2 3 4 5 6 7 8 9 10
-bool prevent_moves[11][11] = {{1,1,1,1,1,1,1,1,1,1,1}, // 0
+/*bool prevent_moves[11][11] = {{1,1,1,1,1,1,1,1,1,1,1}, // 0
                               {0,0,0,1,1,0,1,1,1,1,1}, // 1
                               {0,0,0,1,1,0,1,1,1,1,1}, // 2
                               {0,1,1,0,0,1,0,1,1,1,1}, // 3
@@ -26,7 +27,7 @@ bool prevent_moves[11][11] = {{1,1,1,1,1,1,1,1,1,1,1}, // 0
                               {0,1,1,1,1,1,1,0,1,1,1}, // 7
                               {0,1,1,1,1,1,1,1,0,1,1}, // 8
                               {0,1,1,1,1,1,1,1,1,0,1}, // 9
-                              {0,1,1,1,1,1,1,1,1,1,0}}; // 10
+                              {0,1,1,1,1,1,1,1,1,1,0}}; // 10*/
 
 /*
  * 8 cases
@@ -125,18 +126,19 @@ bool is_htr(Cube cb) {
     return is_htr;
 }
 
-bool search(Cube cb, uint8_t d, uint8_t sd, uint8_t lm, uint8_t* moves) {
-    cb = move(cb,lm);
+// lm0 is the last move lm1 is the move before that
+bool search(Cube cb, uint8_t d, uint8_t sd, uint8_t lm0, uint8_t lm1, uint8_t* moves) {
+    cb = move(cb, lm0);
     if (d == 1) {
         Cube cb2 = cb;
-        if (prevent_moves[lm][1]) {
+        if (prevent_moves[lm1][lm0][1]) {
             cb = move(cb,1);
             if (is_htr(cb)) {
                 moves[sd-d] = 1;
                 return true;
             }
         }
-        if(prevent_moves[lm][3]) {
+        if(prevent_moves[lm1][lm0][3]) {
             cb = move(cb2,3);
             if (is_htr(cb)) {
                 moves[sd-d] = 3;
@@ -146,8 +148,8 @@ bool search(Cube cb, uint8_t d, uint8_t sd, uint8_t lm, uint8_t* moves) {
         return false;
     }
     for (int m = 1; m <= 10; m++) {
-        if (prevent_moves[lm][m]) {
-            bool b = search(cb, d - 1, sd, m, moves);
+        if (prevent_moves[lm1][lm0][m]) {
+            bool b = search(cb, d - 1, sd, m, lm0, moves);
             if (b){
                 moves[sd-d] = m;
                 return true;
@@ -158,7 +160,7 @@ bool search(Cube cb, uint8_t d, uint8_t sd, uint8_t lm, uint8_t* moves) {
 }
 
 bool call_search(Cube cb, uint8_t d, uint8_t* moves) {
-    return search(cb, d, d,0, moves);
+    return search(cb, d, d, 0, 0, moves);
 }
 
 /**
@@ -261,58 +263,27 @@ uint32_t transform(uint8_t c, uint8_t t) {
     }
 }
 
-void print_human_method_states(Cube cb, uint8_t* moves, uint8_t count) {
-    Cube tcb = cb;
-    for (uint8_t i = 0; i < count; i++) {
-        tcb = move(tcb, moves[i]);
-    }
-    cb.c = tcb.c;
-
- //   for
-}
-
-/*
-"""
-GET_HUMAN_METHOD_STATES
-Diese Funktion berechnet für die aktuelle HTR alle 6 anderen Möglichkeiten den gleichen EO+CO cases zu lösen, aber CP verändert.
-"""
-function get_human_method_states(e,c,list)
-    #Führe die HTR aus
-    for m in list
-        et,c = move(e,c,m)
-    end
-    #Führe 5 verschiedene kanonische CP Transformationen aus
-    list2 = reverse(list)
-    co = zeros(UInt64,5)
-    for t = 1:5
-        co[t] = transform(c,t)
-        #Für jede von ihnen, invertiere die Züge in list
-        for m in list2
-            et,co[t] = move_back(e,co[t],m)
-        end
-        #Berechne für diese jeweils eine HTR solution
-        for i = 1:11
-            println(i)
-            f,htrs = search(e,co[t],i,0)
-            if f
-                println(list_to_notation(htrs))
-                break
-            end
-        end
-    end
-end
- */
-
 int main(int argc, char** argv) {
 
     clock_t t0 = std::clock();
+    double wt0;
     init_htr_states();
     int depth = 4;
     Cube cb;
+    bool findall = false;
     bool normal = true;
-    if(argc == 4) {
+    if(argc >= 4) {
         depth = std::stoi(argv[3]);
         cb = parse_cube(argv[1], argv[2]);
+        Cube db0 = move(cb, 9);
+        db0 = move(db0, 4);
+        db0 = move(db0, 8);
+        db0 = move(db0, 1);
+        db0 = move(db0, 7);
+        db0 = move(db0, 2);
+        std::cout << "Cube " << parse_cube_inv(db0) << " in htr: " << (bool) is_htr(db0) << std::endl;
+        // F2 R' D2 L U2 L'
+        if(argc == 5) findall = true;
     }
     else if (argc == 2) {
         depth = std::stoi(argv[1]);
@@ -336,16 +307,16 @@ int main(int argc, char** argv) {
             uint32_t chunk_size = states.size() / num_threads;
             uint32_t start_index = i * chunk_size;
             uint32_t end_index = (i == num_threads - 1) ? states.size() - 1 : start_index + chunk_size;
-            uint32_t progress_chunks = chunk_size/100;
+            uint32_t progress_chunks = chunk_size/10000;
             uint32_t percent = 0;
             uint32_t prog = 0;
-            t0 = std::clock();
+            wt0 = omp_get_wtime();
 
             for(uint32_t j = start_index; j <= end_index; j++) {
                 prog++;
                 if(i == num_threads - 1 && prog >= progress_chunks) {
                     prog = 0;
-                    std::cout << (int) percent << "% @" << (float)(std::clock() - t0)/CLOCKS_PER_SEC << "s" << std::endl;;
+                    std::cout << (float) percent/100 << "% @" << (float)(omp_get_wtime() - wt0) << "s" << std::endl;;
                     percent++;
                 }
                 solutions[j] = new uint8_t[depth];
@@ -374,7 +345,6 @@ int main(int argc, char** argv) {
         file.close();
     }
     else {
-        bool findall = false;
         // standard test: 00100010 02173654
         t0 = std::clock();
         for(int d = 1; d <= depth; d++) {

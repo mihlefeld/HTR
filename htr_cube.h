@@ -83,8 +83,8 @@ inline Cube move(Cube cb, uint8_t m) {
             cb.e = toggle(cb.e,1);
             cb.e = toggle(cb.e,4);
             cb.e = toggle(cb.e,0),
-                    // CP: cycle 4-3-0-5
-                    cb.c = cycle_bits_32bit(cb.c,4*3,3*3,0*3,5*3,7);
+            // CP: cycle 4-3-0-5
+            cb.c = cycle_bits_32bit(cb.c,4*3,3*3,0*3,5*3,7);
             return cb;
         case 5:
             // L2
