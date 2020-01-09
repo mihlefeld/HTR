@@ -204,11 +204,11 @@ bool search(Cube cb, uint8_t d, uint8_t sd, uint8_t lm0, uint8_t lm1, uint8_t* m
 }
 
 bool call_search(Cube cb, uint8_t d, uint8_t* moves) {
-    if(is_htr(cb)) {
+    if(d == 0) {
         for(int i = 0; i < d; i++) {
             moves[d] = 0;
         }
-        return true;
+        return is_htr(cb);
     }
     return search(cb, d, d, 0, 0, moves);
 }
@@ -254,8 +254,8 @@ bool search_all(Cube cb, uint8_t d, uint8_t sd, uint8_t lm0, uint8_t lm1, uint8_
 }
 
 bool call_search_all(Cube cb, uint8_t d, std::vector<uint8_t*>& solutions) {
-    if(is_htr(cb)) {
-        return true;
+    if(d == 0) {
+        return is_htr(cb);
     }
     bool has_sol;
     uint8_t* moves = new uint8_t[d];
@@ -293,8 +293,8 @@ bool search_no_sol(Cube cb, uint8_t d, uint8_t sd, uint8_t lm0, uint8_t lm1) {
 }
 
 bool call_search_no_sol(Cube cb, uint8_t d) {
-    if(is_htr(cb)) {
-        return true;
+    if(d == 0) {
+        return is_htr(cb);
     }
     return search_no_sol(cb, d, d, 0, 0);
 }
@@ -375,32 +375,6 @@ void gen_domino_states(std::vector<Cube>& states, int sample_size) {
     }
 }
 
-uint32_t transform(uint8_t c, uint8_t t) {
-    switch (t){
-        case 1:
-            c = swap_bits_32bit(c,1*3,3*3,7);
-            return c;
-        case 2:
-            c = swap_bits_32bit(c,3*3,1*3,7);
-            c = swap_bits_32bit(c,3*3,7*3,7);
-            return c;
-        case 3:
-            c = swap_bits_32bit(c,3*3,7*3,7);
-            c = swap_bits_32bit(c,3*3,1*3,7);
-            return c;
-        case 4:
-            c = swap_bits_32bit(c,2*3,0*3,7);
-            c = swap_bits_32bit(c,2*3,4*3,7);
-            return c;
-        case 5:
-            c = swap_bits_32bit(c,2*3,4*3,7);
-            c = swap_bits_32bit(c,2*3,0*3,7);
-            return c;
-        default:
-            return c;
-    }
-}
-
 void calc_distribution(uint8_t depth, uint32_t sample_size, int threads, bool log_to_file, std::string path) {
     std::vector<Cube> states;
     gen_domino_states(states, sample_size);
@@ -438,7 +412,7 @@ void calc_distribution(uint8_t depth, uint32_t sample_size, int threads, bool lo
                     priv_counts[0] += 1;
                     continue;
                 }
-                for (int d = 1; d <= depth; d++) {
+                for (int d = 0; d <= depth; d++) {
                     if (call_search_no_sol(states[j], d)) {
                         priv_counts[d] += 1;
                         break;
@@ -476,7 +450,7 @@ void calc_solution(bool all, Cube cube, int depth, bool log_to_file, std::string
     std::cout << "Solving HTR for Cube: " << parse_cube_inv(cube) << std::endl;
     std::string output = "HTR Solutions for Cube: " + parse_cube_inv(cube);
     if (all) {
-        for(int d = 1; d <= depth; d++) {
+        for(int d = 0; d <= depth; d++) {
             std::cout << "Searching depth " << d << std::endl;
             std::vector<uint8_t*> moves;
             if(call_search_all(cube, d, moves)) {
@@ -491,7 +465,7 @@ void calc_solution(bool all, Cube cube, int depth, bool log_to_file, std::string
         }
     }
     else {
-        for(int d = 1; d <= depth; d++) {
+        for(int d = 0; d <= depth; d++) {
             std::cout << "Searching depth " << d << std::endl;
             uint8_t moves[depth];
             if(call_search(cube, d, moves)) {
@@ -519,7 +493,7 @@ void calc_hus(bool all, uint8_t eo, uint8_t co, uint8_t depth, bool log_to_file,
         uint32_t cp = cps[i];
         Cube cube = {eo, cp};
         if (all) {
-            for(int d = 1; d <= depth; d++) {
+            for(int d = 0; d <= depth; d++) {
                 std::vector<uint8_t*> moves;
                 std::cout << "Searching depth " << d  << "..." << std::endl;
                 if(call_search_all(cube, d, moves)) {
@@ -534,7 +508,7 @@ void calc_hus(bool all, uint8_t eo, uint8_t co, uint8_t depth, bool log_to_file,
             }
         }
         else {
-            for(int d = 1; d <= depth; d++) {
+            for(int d = 0; d <= depth; d++) {
                 uint8_t moves[depth];
                 std::cout << "Searching depth " << d  << "..." << std::endl;
                 if(call_search(cube, d, moves)) {
