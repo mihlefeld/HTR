@@ -205,9 +205,6 @@ bool search(Cube cb, uint8_t d, uint8_t sd, uint8_t lm0, uint8_t lm1, uint8_t* m
 
 bool call_search(Cube cb, uint8_t d, uint8_t* moves) {
     if(d == 0) {
-        for(int i = 0; i < d; i++) {
-            moves[d] = 0;
-        }
         return is_htr(cb);
     }
     return search(cb, d, d, 0, 0, moves);
@@ -254,11 +251,12 @@ bool search_all(Cube cb, uint8_t d, uint8_t sd, uint8_t lm0, uint8_t lm1, uint8_
 }
 
 bool call_search_all(Cube cb, uint8_t d, std::vector<uint8_t*>& solutions) {
-    if(d == 0) {
-        return is_htr(cb);
-    }
     bool has_sol;
     uint8_t* moves = new uint8_t[d];
+    if(d == 0) {
+        solutions.push_back(moves);
+        return is_htr(cb);
+    }
     has_sol = search_all(cb, d, d, 0, 0, moves, solutions);
     return has_sol;
 }
