@@ -7,6 +7,7 @@
 #include <omp.h>
 #include <cmath>
 #include <getopt.h>
+#include <fstream>
 #include "htr_cube.h"
 #include "prevent_moves_3d.h"
 
@@ -122,78 +123,8 @@ bool is_htr(Cube cb) {
     return is_htr;
 }
 
-// lm0 is the last move lm1 is the move before that
-bool search(Cube cb, uint8_t d, uint8_t sd, uint8_t lm0, uint8_t lm1, uint8_t* moves) {
-    cb = move(cb, lm0);
-    if (d == 1) {
-        Cube cb2 = cb;
-        if (prevent_moves[lm1][lm0][1]) {
-            cb = move(cb,1);
-            if (is_htr(cb)) {
-                moves[sd-d] = 1;
-                return true;
-            }
-        }
-        if(prevent_moves[lm1][lm0][3]) {
-            cb = move(cb2,3);
-            if (is_htr(cb)) {
-                moves[sd-d] = 3;
-                return true;
-            }
-        }
-        return false;
-    }
-    for (int m = 1; m <= 10; m++) {
-        if (prevent_moves[lm1][lm0][m]) {
-            bool b = search(cb, d - 1, sd, m, lm0, moves);
-            if (b){
-                moves[sd-d] = m;
-                return true;
-            }
-        }
-    }
-    return false;
-}
-
-bool call_search(Cube cb, uint8_t d, uint8_t* moves) {
-    return search(cb, d, d, 0, 0, moves);
-}
-
-bool search_no_sol(Cube cb, uint8_t d, uint8_t sd, uint8_t lm0, uint8_t lm1) {
-    cb = move(cb, lm0);
-    if (d == 1) {
-        Cube cb2 = cb;
-        if (prevent_moves[lm1][lm0][1]) {
-            cb = move(cb,1);
-            if (is_htr(cb)) {
-                return true;
-            }
-        }
-        if(prevent_moves[lm1][lm0][3]) {
-            cb = move(cb2,3);
-            if (is_htr(cb)) {
-                return true;
-            }
-        }
-        return false;
-    }
-    for (int m = 1; m <= 10; m++) {
-        if (prevent_moves[lm1][lm0][m]) {
-            bool b = search_no_sol(cb, d - 1, sd, m, lm0);
-            if (b){
-                return true;
-            }
-        }
-    }
-    return false;
-}
-
-bool call_search_no_sol(Cube cb, uint8_t d) {
-    return search_no_sol(cb, d, d, 0, 0);
-}
-
 /**
- * 
+ *
  * @param int_moves
  * @param count
  * @return
@@ -237,6 +168,123 @@ std::string convert_to_wca_notation(uint8_t* int_moves, uint8_t count) {
         }
     }
     return wca_moves;
+}
+
+// lm0 is the last move lm1 is the move before that
+bool search(Cube cb, uint8_t d, uint8_t sd, uint8_t lm0, uint8_t lm1, uint8_t* moves) {
+    cb = move(cb, lm0);
+    if (d == 1) {
+        Cube cb2 = cb;
+        if (prevent_moves[lm1][lm0][1]) {
+            cb = move(cb,1);
+            if (is_htr(cb)) {
+                moves[sd-d] = 1;
+                return true;
+            }
+        }
+        if(prevent_moves[lm1][lm0][3]) {
+            cb = move(cb2,3);
+            if (is_htr(cb)) {
+                moves[sd-d] = 3;
+                return true;
+            }
+        }
+        return false;
+    }
+    for (int m = 1; m <= 10; m++) {
+        if (prevent_moves[lm1][lm0][m]) {
+            bool b = search(cb, d - 1, sd, m, lm0, moves);
+            if (b){
+                moves[sd-d] = m;
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+bool call_search(Cube cb, uint8_t d, uint8_t* moves) {
+    return search(cb, d, d, 0, 0, moves);
+}
+
+bool search_all(Cube cb, uint8_t d, uint8_t sd, uint8_t lm0, uint8_t lm1, uint8_t* moves ,std::vector<uint8_t*>& solutions) {
+    cb = move(cb, lm0);
+    if (d == 1) {
+        Cube cb2 = cb;
+        if (prevent_moves[lm1][lm0][1]) {
+            cb = move(cb,1);
+            if (is_htr(cb)) {
+                moves[sd-d] = 1;
+                uint8_t* arr = new uint8_t[sd];
+                for(uint8_t i = 0; i < sd; i++) {
+                    arr[i] = moves[i];
+                }
+                solutions.push_back(arr);
+                return true;
+            }
+        }
+        if(prevent_moves[lm1][lm0][3]) {
+            cb = move(cb2,3);
+            if (is_htr(cb)) {
+                moves[sd-d] = 3;
+                uint8_t* arr = new uint8_t[sd];
+                for(uint8_t i = 0; i < sd; i++) {
+                    arr[i] = moves[i];
+                }
+                solutions.push_back(arr);
+                return true;
+            }
+        }
+        return false;
+    }
+    bool found = false;
+    for (int m = 1; m <= 10; m++) {
+        if (prevent_moves[lm1][lm0][m]) {
+            moves[sd-d] = m;
+            found |= search_all(cb, d - 1, sd, m, lm0, moves, solutions);
+        }
+    }
+    return found;
+}
+
+bool call_search_all(Cube cb, uint8_t d, std::vector<uint8_t*>& solutions) {
+    bool has_sol;
+    uint8_t* moves = new uint8_t[d];
+    has_sol = search_all(cb, d, d, 0, 0, moves, solutions);
+    return has_sol;
+}
+
+bool search_no_sol(Cube cb, uint8_t d, uint8_t sd, uint8_t lm0, uint8_t lm1) {
+    cb = move(cb, lm0);
+    if (d == 1) {
+        Cube cb2 = cb;
+        if (prevent_moves[lm1][lm0][1]) {
+            cb = move(cb,1);
+            if (is_htr(cb)) {
+                return true;
+            }
+        }
+        if(prevent_moves[lm1][lm0][3]) {
+            cb = move(cb2,3);
+            if (is_htr(cb)) {
+                return true;
+            }
+        }
+        return false;
+    }
+    for (int m = 1; m <= 10; m++) {
+        if (prevent_moves[lm1][lm0][m]) {
+            bool b = search_no_sol(cb, d - 1, sd, m, lm0);
+            if (b){
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+bool call_search_no_sol(Cube cb, uint8_t d) {
+    return search_no_sol(cb, d, d, 0, 0);
 }
 
 void co_to_cp_list(uint8_t co, uint32_t* cp_list) {
@@ -341,7 +389,7 @@ uint32_t transform(uint8_t c, uint8_t t) {
     }
 }
 
-void calc_distribution(uint8_t depth, uint32_t sample_size, int threads) {
+void calc_distribution(uint8_t depth, uint32_t sample_size, int threads, bool log_to_file, std::string path) {
     std::vector<Cube> states;
     gen_domino_states(states, sample_size);
     if(sample_size != 0 && sample_size < states.size()) {
@@ -381,7 +429,6 @@ void calc_distribution(uint8_t depth, uint32_t sample_size, int threads) {
                 for (int d = 1; d <= depth; d++) {
                     if (call_search_no_sol(states[j], d)) {
                         priv_counts[d] += 1;
-                        //std::cout << "Cube #" << j << ": " << parse_cube_inv(states[j]) << " sol len: " << d << std::endl;
                         break;
                     }
                 }
@@ -402,48 +449,97 @@ void calc_distribution(uint8_t depth, uint32_t sample_size, int threads) {
             }
         }
     }
+    std::string output = "";
     for (int i = 0; i <= depth; i++) {
-        std::cout << "len " << i << ": " << counts[i] << std::endl;
+        output += "len " + std::to_string(i) + ": " + std::to_string(counts[i]) + "\n";
     }
+    std::cout << output;
+    std::fstream file(path, std::ios_base::out);
+    if(log_to_file)
+        file << output;
 }
 
-void calc_solution(bool single, Cube cube, int depth) {
+void calc_solution(bool all, Cube cube, int depth, bool log_to_file, std::string path) {
     // standard test: 00100010 02173654
-    std::cout << "Solving HTR for cube: " << parse_cube_inv(cube) << std::endl;
-    for(int d = 1; d <= depth; d++) {
-        std::cout << "Searching depth " << d << std::endl;
-        uint8_t moves[depth];
-        if(call_search(cube, d, moves)) {
-            std::cout << "Found HTR in " << d << " moves" << std::endl;
-            std::cout << convert_to_wca_notation(moves, d) << std::endl;
-            break;
-        }
-    }
-}
-
-void calc_hus(uint8_t eo, uint8_t co, uint8_t depth) {
-    std::bitset<8> edges(eo);
-    std::bitset<8> corners(co);
-    std::cout << "Solving HUS HTR for cube: " << edges << " " << corners << std::endl;
-    std::vector<std::string> solutions;
-    uint32_t cps[6];
-    co_to_cp_list(co, cps);
-    double t0 = omp_get_wtime();
-    for(auto cp: cps) {
-        Cube cube = {eo, cp};
-        std::cout << "Cube: " << parse_cube_inv(cube) << std::endl;
+    std::cout << "Solving HTR for Cube: " << parse_cube_inv(cube) << std::endl;
+    std::string output = "HTR Solutions for Cube: " + parse_cube_inv(cube);
+    if (all) {
         for(int d = 1; d <= depth; d++) {
-            uint8_t moves[depth];
-            if(call_search(cube, d, moves)) {
-                std::cout << "    " << d << " moves @" << (double) omp_get_wtime() - t0 << "s" << std::endl;
-                solutions.push_back(convert_to_wca_notation(moves, d) + "(" + std::to_string(d) + ")");
+            std::cout << "Searching depth " << d << std::endl;
+            std::vector<uint8_t*> moves;
+            if(call_search_all(cube, d, moves)) {
+                std::cout << "-------- Found " << moves.size() <<" HTRs in " << d << " moves --------" << std::endl;
+                for(auto sol: moves) {
+                    std::cout << convert_to_wca_notation(sol, d) << std::endl;
+                    output += "\n" + convert_to_wca_notation(sol, d);
+                }
+                std::cout << "----------------------------------------------------" << std::endl;
                 break;
             }
         }
     }
+    else {
+        for(int d = 1; d <= depth; d++) {
+            std::cout << "Searching depth " << d << std::endl;
+            uint8_t moves[depth];
+            if(call_search(cube, d, moves)) {
+                std::cout << "Found HTR in " << d << " moves" << std::endl;
+                std::cout << convert_to_wca_notation(moves, d);
+                output += "\n" + convert_to_wca_notation(moves, d);
+                break;
+            }
+        }
+    }
+    std::fstream file(path, std::ios_base::out);
+    if(log_to_file)
+        file << output;
+}
 
-    for(auto str: solutions) {
-        std::cout << str << std::endl;
+void calc_hus(bool all, uint8_t eo, uint8_t co, uint8_t depth, bool log_to_file, std::string path) {
+    std::bitset<8> edges(eo);
+    std::bitset<8> corners(co);
+    std::cout << "Solving HUS HTR for cube: " << edges << " " << corners << std::endl;
+    uint32_t cps[6];
+    co_to_cp_list(co, cps);
+    std::string output = "Human Method Solver with Cube: " + edges.to_string() + "-" + corners.to_string();
+    double t0 = omp_get_wtime();
+    for(int i = 0; i < 6; i++) {
+        uint32_t cp = cps[i];
+        Cube cube = {eo, cp};
+        if (all) {
+            for(int d = 1; d <= depth; d++) {
+                std::vector<uint8_t*> moves;
+                std::cout << "Searching depth " << d  << "..." << std::endl;
+                if(call_search_all(cube, d, moves)) {
+                    std::cout << "-------- Found " << moves.size() <<" HTRs in " << d << " moves @" << (double) omp_get_wtime() - t0 << "s" << " --------" << std::endl;
+                    output += "\nCase: " +  std::to_string(i) + "\nOptimal:" + std::to_string(d) + " moves\nCount:" + std::to_string(moves.size()) + "\n";
+                    for(auto sol: moves) {
+                        output += convert_to_wca_notation(sol, d) + "\n";
+                    }
+                    output += "\n";
+                    break;
+                }
+            }
+        }
+        else {
+            for(int d = 1; d <= depth; d++) {
+                uint8_t moves[depth];
+                std::cout << "Searching depth " << d  << "..." << std::endl;
+                if(call_search(cube, d, moves)) {
+                    std::cout << "    " << d << " moves @" << (double) omp_get_wtime() - t0 << "s" << std::endl;
+                    output += "Case: " +  std::to_string(i) + "\nOptimal:" + std::to_string(d) + " moves\nCount:" + std::to_string(1) + "\n";
+                    output += convert_to_wca_notation(moves, d);
+                    output += "\n";
+                    break;
+                }
+            }
+        }
+    }
+    std::cout << output;
+    if(log_to_file) {
+        std::ofstream file(path.c_str(), std::ios_base::out);
+        file << output;
+        file.close();
     }
 }
 
@@ -461,6 +557,8 @@ void error_message() {
     std::cout << "    Specify the sample size for distribution calculation." << std::endl;
     std::cout << "  -t :" << std::endl;
     std::cout << "    Specify the number of threads for distribution calculation." << std::endl;
+    std::cout << "  -f :" << std::endl;
+    std::cout << "    Specify an output file to write the results in." << std::endl;
     exit(-1);
 }
 
@@ -478,13 +576,16 @@ int main(int argc, char** argv) {
     bool dist = false;
     bool sol = false;
     bool hus = false;
+    bool all = false;
+    bool log_to_file = false;
+    std::string path;
 
     if(argc < 2) {
         error_message();
     }
 
     int c = 0;
-    while ((c = getopt(argc, argv, "dn:s:h:r:t:")) != -1) {
+    while ((c = getopt(argc, argv, "adn:s:h:r:t:f:")) != -1) {
         switch (c) {
             case 'n': {
                 sample_size = std::stoi(optarg);
@@ -518,6 +619,15 @@ int main(int argc, char** argv) {
                 threads = std::stoi(optarg);
                 break;
             }
+            case 'a': {
+                all = true;
+                break;
+            }
+            case 'f': {
+                path = std::string(optarg);
+                log_to_file = true;
+                break;
+            }
             case '?': {
                 error_message();
                 break;
@@ -530,13 +640,13 @@ int main(int argc, char** argv) {
 
     t0 = omp_get_wtime();
     if(dist) {
-        calc_distribution(depth, sample_size, threads);
+        calc_distribution(depth, sample_size, threads, log_to_file, path);
     }
     if(sol) {
-        calc_solution(false, cube, depth);
+        calc_solution(all, cube, depth, log_to_file, path);
     }
     if(hus) {
-        calc_hus(eo, co, depth);
+        calc_hus(all, eo, co, depth, log_to_file, path);
     }
     std::cout << "Done in " << omp_get_wtime() - t0 << std::endl;
     return 0;
