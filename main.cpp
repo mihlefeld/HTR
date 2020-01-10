@@ -389,47 +389,37 @@ void calc_distribution(uint8_t depth, uint32_t sample_size, int threads, bool lo
     for (int i = 0; i <= depth; i++) {
         counts[i] = 0;
     }
-    bounds[0] = 0;
-    for (int i = 1; i < num_threads; i++) {
-        bounds[i] = (int) ((float)states.size()*i/num_threads);
-    }
-    bounds[num_threads] = states.size();
 
     #pragma omp parallel default(none) shared(states,depth,bounds,num_threads,counts,std::cout,t0) num_threads(num_threads)
     {
-        uint8_t priv_counts[num_threads];
+        int id = omp_get_thread_num();
+        uint8_t private_counts[num_threads];
         for (int i = 0; i <= depth; i++) {
-            priv_counts[i] = 0;
+            private_counts[i] = 0;
         }
-        #pragma omp for
-        for (int i = 0; i < num_threads; i++) {
-            const double chunk_size = (bounds[i + 1] - bounds[i])/100.0f;
-            uint8_t percent_progress = 0;
-            for (int j = bounds[i]; j < bounds[i + 1]; j++) {
-                if (is_htr(states[j])) {
-                    priv_counts[0] += 1;
-                    continue;
-                }
-                for (int d = 0; d <= depth; d++) {
-                    if (call_search_no_sol(states[j], d)) {
-                        priv_counts[d] += 1;
-                        break;
-                    }
-                }
-                percent_progress++;
-                if(percent_progress > chunk_size) {
-                    #pragma omp critical
-                    {
-                        std::cout << "Proc " << i << ": " << (double) ((j+1) - bounds[i]) / chunk_size << "% @" << omp_get_wtime() - t0 << std::endl;
-                    }
-                    percent_progress = 0;
+        double progress = 0;
+        double chunk_size = (states.size() / 12.0f) / 100.0f;
+        int percent_progress = 0;
+#pragma omp for
+        for (int i = 0; i < states.size(); i++) {
+            for (int d = 0; d <= depth; d++) {
+                if (call_search_no_sol(states[i], d)) {
+                    private_counts[d] += 1;
+                    break;
                 }
             }
+            percent_progress++;
+            progress += chunk_size;
+            if (percent_progress > chunk_size) {
+                percent_progress = 0;
+                std::cout << "Proc " << id << " : " << (double) progress << "% @" << omp_get_wtime() - t0 << "s..."
+                          << std::endl;
+            }
         }
-        #pragma omp critical
+#pragma omp critical
         {
             for (int i = 0; i <= depth; i++) {
-                counts[i] += priv_counts[i];
+                counts[i] += private_counts[i];
             }
         }
     }
