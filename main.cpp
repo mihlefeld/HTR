@@ -386,9 +386,11 @@ void calc_distribution(uint8_t depth, uint32_t sample_size, int threads, bool lo
     double t0 = omp_get_wtime();
     uint8_t num_threads = threads;
     uint32_t counts[num_threads][depth + 1];
+    uint32_t counts_final[depth + 1];
     for (int i = 0; i <= depth; i++) {
         for (int j = 0; j < num_threads; j++) {
             counts[j][i] = 0;
+            counts_final[j] = 0;
         }
     }
 
@@ -398,7 +400,7 @@ void calc_distribution(uint8_t depth, uint32_t sample_size, int threads, bool lo
         double progress = 0;
         double chunk_size = (double) states.size() / num_threads;
         int percent_progress = 0;
-#pragma omp for
+#pragma omp for schedule(dynamic, 1)
         for (int i = 0; i < states.size(); i++) {
             for (int d = 0; d <= depth; d++) {
                 if (call_search_no_sol(states[i], d)) {
@@ -417,7 +419,6 @@ void calc_distribution(uint8_t depth, uint32_t sample_size, int threads, bool lo
     }
     std::string output = "";
     int sum = 0;
-    uint32_t counts_final[depth];
     for (int j = 0; j < num_threads; j++) {
         for (int i = 0; i <= depth; i++) {
             counts_final[i] += counts[j][i];
