@@ -416,6 +416,7 @@ void calc_distribution(uint8_t depth, uint32_t sample_size, int threads, bool lo
                           << std::endl;
             }
         }
+#pragma omp barrier
 #pragma omp critical
         {
             for (int i = 0; i <= depth; i++) {
