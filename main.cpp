@@ -382,15 +382,15 @@ void calc_distribution(uint8_t depth, uint32_t sample_size, int threads, bool lo
             states.erase(states.begin()+index);
         }
     }
+    std::cout << "states.size() = " << states.size() << std::endl;
     double t0 = omp_get_wtime();
     uint8_t num_threads = threads;
     uint32_t counts[depth + 1];
-    uint32_t bounds[num_threads+1];
     for (int i = 0; i <= depth; i++) {
         counts[i] = 0;
     }
 
-    #pragma omp parallel default(none) shared(states,depth,bounds,num_threads,counts,std::cout,t0) num_threads(num_threads)
+#pragma omp parallel default(none) firstprivate(states, depth, num_threads, counts, t0) num_threads(num_threads) shared(std::cout)
     {
         int id = omp_get_thread_num();
         uint8_t private_counts[num_threads];
@@ -398,7 +398,7 @@ void calc_distribution(uint8_t depth, uint32_t sample_size, int threads, bool lo
             private_counts[i] = 0;
         }
         double progress = 0;
-        double chunk_size = (states.size() / 12.0f) / 100.0f;
+        double chunk_size = ((double) states.size() / num_threads) / 100.0f;
         int percent_progress = 0;
 #pragma omp for
         for (int i = 0; i < states.size(); i++) {
@@ -542,7 +542,7 @@ int main(int argc, char** argv) {
     double t0;
     int depth = 14;
     int sample_size = 0;
-    int seed = 42;
+    int seed;
     int threads = 12;
     uint8_t co;
     uint8_t eo;
