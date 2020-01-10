@@ -417,13 +417,17 @@ void calc_distribution(uint8_t depth, uint32_t sample_size, int threads, bool lo
     }
     std::string output = "";
     int sum = 0;
+    uint32_t counts_final[depth];
     for (int j = 0; j < num_threads; j++) {
-        output += "Proc " + std::to_string(j) + ": \n";
         for (int i = 0; i <= depth; i++) {
-            output += "Depth " + std::to_string(i) + ": " + std::to_string(counts[j][i]) + "\n";
-            sum += counts[j][i];
+            counts_final[i] += counts[j][i];
         }
     }
+    for (int i = 0; i <= depth; i++) {
+        output += "Depth " + std::to_string(i) + ": " + std::to_string(counts_final[i]) + "\n";
+        sum += counts_final[i];
+    }
+
     output += "Sum = " + std::to_string(sum) + "\n";
     std::cout << output;
     std::fstream file(path, std::ios_base::out);
