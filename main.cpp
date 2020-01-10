@@ -385,18 +385,16 @@ void calc_distribution(uint8_t depth, uint32_t sample_size, int threads, bool lo
     std::cout << "states.size() = " << states.size() << std::endl;
     double t0 = omp_get_wtime();
     uint8_t num_threads = threads;
-    uint32_t counts[depth + 1];
+    uint32_t counts[num_threads][depth + 1];
     for (int i = 0; i <= depth; i++) {
-        counts[i] = 0;
+        for (int j = 0; j < num_threads; j++) {
+            counts[j][i] = 0;
+        }
     }
 
-#pragma omp parallel default(none) firstprivate(states, depth, num_threads, t0) num_threads(num_threads) shared(std::cout, counts)
+#pragma omp parallel default(none) firstprivate(states, depth, num_threads, t0) num_threads(num_threads) shared(counts, std::cout)
     {
         int id = omp_get_thread_num();
-        uint8_t private_counts[num_threads];
-        for (int i = 0; i <= depth; i++) {
-            private_counts[i] = 0;
-        }
         double progress = 0;
         double chunk_size = (double) states.size() / num_threads;
         int percent_progress = 0;
@@ -404,7 +402,7 @@ void calc_distribution(uint8_t depth, uint32_t sample_size, int threads, bool lo
         for (int i = 0; i < states.size(); i++) {
             for (int d = 0; d <= depth; d++) {
                 if (call_search_no_sol(states[i], d)) {
-                    private_counts[d] += 1;
+                    counts[id][d] += 1;
                     break;
                 }
             }
@@ -416,24 +414,20 @@ void calc_distribution(uint8_t depth, uint32_t sample_size, int threads, bool lo
                           << std::endl;
             }
         }
-#pragma omp barrier
-#pragma omp critical
-        {
-            for (int i = 0; i <= depth; i++) {
-                counts[i] += private_counts[i];
-            }
-        }
     }
     std::string output = "";
     int sum = 0;
-    for (int i = 0; i <= depth; i++) {
-        output += "Depth " + std::to_string(i) + ": " + std::to_string(counts[i]) + "\n";
-        sum += counts[i];
+    for (int j = 0; j < num_threads; j++) {
+        output += "Proc " + std::to_string(j) + ": \n";
+        for (int i = 0; i <= depth; i++) {
+            output += "Depth " + std::to_string(i) + ": " + std::to_string(counts[j][i]) + "\n";
+            sum += counts[j][i];
+        }
     }
-    output += "Sum = " + std::to_string(sum);
+    output += "Sum = " + std::to_string(sum) + "\n";
     std::cout << output;
     std::fstream file(path, std::ios_base::out);
-    if(log_to_file)
+    if (log_to_file)
         file << output;
 }
 
