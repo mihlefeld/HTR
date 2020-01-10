@@ -398,7 +398,7 @@ void calc_distribution(uint8_t depth, uint32_t sample_size, int threads, bool lo
             private_counts[i] = 0;
         }
         double progress = 0;
-        double chunk_size = (double) (states.size() / num_threads);
+        double chunk_size = (double) states.size() / num_threads;
         int percent_progress = 0;
 #pragma omp for
         for (int i = 0; i < states.size(); i++) {
@@ -409,8 +409,8 @@ void calc_distribution(uint8_t depth, uint32_t sample_size, int threads, bool lo
                 }
             }
             percent_progress++;
-            progress += chunk_size;
-            if (percent_progress * 100 >= chunk_size) {
+            if ((percent_progress / chunk_size) * 100 >= 1) {
+                progress += 100 / chunk_size;
                 percent_progress = 0;
                 std::cout << "Proc " << id << " : " << (double) progress << "% @" << omp_get_wtime() - t0 << "s..."
                           << std::endl;
@@ -424,9 +424,12 @@ void calc_distribution(uint8_t depth, uint32_t sample_size, int threads, bool lo
         }
     }
     std::string output = "";
+    int sum = 0;
     for (int i = 0; i <= depth; i++) {
-        output += "len " + std::to_string(i) + ": " + std::to_string(counts[i]) + "\n";
+        output += "Depth " + std::to_string(i) + ": " + std::to_string(counts[i]) + "\n";
+        sum += counts[i];
     }
+    output += "Sum = " + std::to_string(sum);
     std::cout << output;
     std::fstream file(path, std::ios_base::out);
     if(log_to_file)
