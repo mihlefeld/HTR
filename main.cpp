@@ -390,7 +390,7 @@ void calc_distribution(uint8_t depth, uint32_t sample_size, int threads, bool lo
     for (int i = 0; i <= depth; i++) {
         for (int j = 0; j < num_threads; j++) {
             counts[j][i] = 0;
-            counts_final[j] = 0;
+            counts_final[i] = 0;
         }
     }
 
